@@ -16,4 +16,3 @@ npm run dev
 - **ReactJs** is to develop front-end. **jQuery** is used to make ajax network calls.
 - Packages like **express-validator**( to write custom validations ), **compression** (gZip compression), **body-parser**(parse request body contents), **mongoose**(MongoDb ODM) are used.
 - **ArcGis** is used to show map.
-- **Mocha** is used to write tests.
