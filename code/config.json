@@ -1,0 +1,3 @@
+{
+	"MONGO_DB_URI" : "mongodb://master:master@ds017886.mlab.com:17886/crossover"
+}

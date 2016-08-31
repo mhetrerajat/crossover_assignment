@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Helpmap</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+    <script src="https://code.jquery.com/jquery-3.1.0.min.js" integrity="sha256-cCueBR6CsyA4/9szpPfrX3s49M9vUU5BgtiJj06wt/s=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://js.arcgis.com/3.17/esri/css/esri.css">
+    <link rel="stylesheet" href="https://js.arcgis.com/3.17/dijit/themes/claro/claro.css">
+    <script src="https://js.arcgis.com/3.17/"></script>
+    <style type="text/css">
+    .content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+    }
+    
+    .donor_card {
+        position: relative;
+        padding: 10px 20px;
+        margin: 0 -15px 15px;
+        border-style: solid;
+        margin-right: 0;
+        margin-left: 0;
+        background-color: #fff;
+        border-color: #ddd;
+        border-width: 1px;
+        border-radius: 4px 4px 0 0;
+        box-shadow: none;
+    }
+    
+    .donors_list {
+        margin: 0 auto;
+        width: 70%;
+    }
+    
+    .add_donor_form,
+    .show_donor,
+    .success_donor {
+        padding: 10px 20px;
+    }
+    
+    #map {
+        height: 100%;
+        padding: 0;
+        margin: 0;
+    }
+    
+    #search {
+        display: block;
+        position: absolute;
+        z-index: 3;
+        top: 90px;
+        left: 75px;
+    }
+    
+    nav {
+        margin-bottom: 0 !important;
+        background: #3F51B5 !important;
+    }
+    
+    nav a {
+        color: #fff !important;
+    }
+    </style>
+</head>
+
+<body class="claro">
+    <script>
+    var socket = io('http://localhost:8081');
+    var options = {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+    };
+
+    function success(pos) {
+        var crd = pos.coords;
+
+        var current_latitude = crd.latitude;
+        var current_longitude = crd.longitude;
+
+
+        require([
+            "esri/map",
+            "esri/dijit/Search",
+            "esri/geometry/Extent",
+            "esri/graphic",
+            "esri/symbols/SimpleMarkerSymbol",
+            "esri/geometry/screenUtils",
+            "dojo/dom",
+            "dojo/dom-construct",
+            "dojo/query",
+            "esri/geometry/Point",
+            "dojo/_base/array",
+            "dojo/dom-style",
+            "dojo/_base/Color",
+            "esri/geometry/webMercatorUtils",
+            "esri/geometry/Extent",
+            "dojo/domReady!"
+        ], function(Map, Search, Extent, Graphic, SimpleMarkerSymbol, screenUtils, dom, domConstruct, query, Point, arrayUtils, domStyle, Color, webMercatorUtils, Extent) {
+            // create a map and instance of the search widget here
+
+            var map = new Map("map", {
+                center: [crd.longitude, crd.latitude],
+                zoom: 13,
+                basemap: "topo"
+            });
+
+            var search = new Search({
+                map: map,
+            }, dom.byId("search"));
+
+            search.startup();
+
+            socket.on("nearby_success", function(data) {
+                map.on("load", mapLoaded(data.result));
+                if (data.result.length == 0) {
+                    alert("No near by donors.");
+                }
+                console.log(data.result);
+            });
+
+
+            map.on('extent-change', function(event) {
+                var current_extent = event.extent;
+                var current_center = webMercatorUtils.webMercatorToGeographic(current_extent.getCenter());
+                console.log(current_center);
+
+                var current_lat = current_center.y.toFixed(3);
+                var current_lng = current_center.x.toFixed(3);
+
+                $.ajax({
+                    url: "http://localhost:8081/api/donor/near",
+                    type: "GET",
+                    dataType: 'json',
+                    data: {
+                        latitude: current_lat,
+                        longitude: current_lng
+                    },
+                    success: function(data) {
+                        console.log("data fetched!");
+                    },
+                    error: function(xhr, status, error) {
+                        console.log(data.error);
+                    }
+                });
+            });
+
+            function mapLoaded(data) {
+                var iconPath = "M233.292,0c-85.1,0-154.334,69.234-154.334,154.333c0,34.275,21.887,90.155,66.908,170.834   c31.846,57.063,63.168,104.643,64.484,106.64l22.942,34.775l22.941-34.774c1.317-1.998,32.641-49.577,64.483-106.64   c45.023-80.68,66.908-136.559,66.908-170.834C387.625,69.234,318.391,0,233.292,0z M233.292,233.291c-44.182,0-80-35.817-80-80   s35.818-80,80-80c44.182,0,80,35.817,80,80S277.473,233.291,233.292,233.291z";
+                var initColor = "#D80027";
+                arrayUtils.forEach(data, function(item) {
+                    //console.log(item);
+                    var graphic = new Graphic(new Point(item.location.coordinates), createSymbol(iconPath, initColor));
+                    graphic.setAttributes({
+                        donor_id: item._id,
+                        address: item.address,
+                        blood_group: item.blood_group,
+                        contact_number: item.contact_number,
+                        email: item.email,
+                        first_name: item.first_name,
+                        last_name: item.last_name,
+                        ip_address: item.ip_address
+                    });
+                    map.graphics.add(graphic);
+                });
+
+            }
+
+            function createSymbol(path, color) {
+                var markerSymbol = new esri.symbol.SimpleMarkerSymbol();
+                markerSymbol.setPath(path);
+                markerSymbol.setColor(new dojo.Color(color));
+                markerSymbol.setOutline(null);
+                return markerSymbol;
+            }
+
+            map.on('click', function(event) {
+                if (event.graphic) {
+                    var location = webMercatorUtils.webMercatorToGeographic(event.mapPoint);
+                    //console.log(location);
+                    document.getElementById('sdc_name').innerHTML = event.graphic.attributes.first_name + " " + event.graphic.attributes.last_name;
+                    document.getElementById('sdc_email').innerHTML = "Email : <a id='btn_sdc_email'>Click here to see</a>";
+                    document.getElementById('sdc_contact_number').innerHTML = "Contact Number : <a id='btn_sdc_contact_number'>Click here to see</a>";
+                    document.getElementById('sdc_blood_group').innerHTML = "Blood Group : " + event.graphic.attributes.blood_group;
+                    document.getElementById('sdc_location').innerHTML = "Location : " + location.x.toFixed(3) + " , " + location.y.toFixed(3);
+                    document.getElementById('sdc_address').innerHTML = "Address : " + event.graphic.attributes.address;
+                    document.getElementById('sdc_ip_address').innerHTML = "IP : " + event.graphic.attributes.ip_address;
+                    $('#btn_sdc_email').click(function() {
+                        document.getElementById('sdc_email').innerHTML = "Email : " + event.graphic.attributes.email;
+                    });
+                    $('#btn_sdc_contact_number').click(function() {
+                        document.getElementById('sdc_contact_number').innerHTML = "Contact Number : " + event.graphic.attributes.contact_number;
+                    });
+                    $('#show_donor_modal').modal('toggle');
+                } else {
+                    var mp = webMercatorUtils.webMercatorToGeographic(event.mapPoint);
+                    var latitude = mp.y.toFixed(3);
+                    var longitude = mp.x.toFixed(3);
+                    document.getElementById('longitude').value = longitude;
+                    document.getElementById('latitude').value = latitude;
+                    $.ajax({
+                        url: "http://maps.googleapis.com/maps/api/geocode/json?latlng=" + latitude + "," + longitude + "&sensor=true",
+                        type: "GET",
+                        cache: false,
+                        success: function(data) {
+                            document.getElementById("address").value = data.results[0].formatted_address;
+                            $.getJSON('//jsonip.com/?callback=?', function(data) {
+                                //console.log(JSON.stringify(data, null, 2));
+                                document.getElementById("ip_address").value = data.ip;
+                            });
+                            //console.log(data.results[0].formatted_address);
+                        },
+                        error: function(xhr, status, error) {
+                            document.getElementById("address").value = "Unknown";
+                        }
+                    });
+                    //console.log(mp.x.toFixed(3) + ", " + mp.y.toFixed(3));
+                    $('#add_donor_modal').modal('toggle');
+                }
+            })
+        });
+    };
+
+    function error(err) {
+        console.warn('ERROR(' + err.code + '): ' + err.message);
+    };
+
+    navigator.geolocation.getCurrentPosition(success, error, options);
+    </script>
+    <div id="app">
+    </div>
+    <script type="text/javascript" src="bundle.js"></script>
+</body>
+
+</html>
